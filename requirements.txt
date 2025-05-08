@@ -1,0 +1,10 @@
+flask
+numpy
+opencv-python
+keras
+tensorflow
+scikit-learn
+matplotlib
+yellowbrick
+hdbscan
+pillow
