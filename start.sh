@@ -1,3 +1,3 @@
-source activate cv
+./.venv/Scripts/activate
 
-flask --app app/index --debug run
+flask --app flask/app.py --debug run
