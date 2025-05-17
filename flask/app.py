@@ -9,7 +9,7 @@ allowed_origins = [
     "http://localhost:5173/"
 ]
 
-cors = CORS(app, origins=allowed_origins)
+CORS(app, origins=allowed_origins)
 
 @app.route('/')
 def hello():
