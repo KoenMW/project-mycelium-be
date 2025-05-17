@@ -9,7 +9,6 @@ def hello():
 
 @app.route('/predict', methods = [ 'POST' ])
 def predict():
-    data = request.get_json()
     day = round(rng() * 20)
     # Add logic to use the model for predictions
     return jsonify({"message": "Not yet implemented, random day given",
@@ -17,7 +16,6 @@ def predict():
 
 @app.route('/cluster', methods=[ 'POST' ])
 def cluster():
-	data = request.get_json()
 	return jsonify({
 		"message": "Not yet implemented, random position given",
 		"position": {
