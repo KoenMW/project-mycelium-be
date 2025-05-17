@@ -13,8 +13,7 @@ def predict():
     # Add logic to use the model for predictions
     return jsonify({
 		"message": "Not yet implemented, random day given",
-    	"day": day,
-		"test": True
+    	"day": day
 	})
 
 @app.route('/cluster', methods=[ 'POST' ])
