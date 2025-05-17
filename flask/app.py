@@ -1,7 +1,15 @@
 from flask import Flask, request, jsonify
 from random import random as rng
+from flask_cors import CORS
 
 app = Flask(__name__)
+
+allowed_origins = [
+    "https://koenmw.github.io/project-mycelium-fe/",
+    "http://localhost:5173/project-mycelium-fe"
+]
+
+cors = CORS(app, origins=allowed_origins)
 
 @app.route('/')
 def hello():
