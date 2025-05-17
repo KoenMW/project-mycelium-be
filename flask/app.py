@@ -5,8 +5,8 @@ from flask_cors import CORS
 app = Flask(__name__)
 
 allowed_origins = [
-    "https://koenmw.github.io/project-mycelium-fe/",
-    "http://localhost:5173/"
+    "https://koenmw.github.io/project-mycelium-fe",
+    "http://localhost:5173"
 ]
 
 CORS(app, origins=allowed_origins)
