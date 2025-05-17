@@ -11,8 +11,11 @@ def hello():
 def predict():
     day = round(rng() * 20)
     # Add logic to use the model for predictions
-    return jsonify({"message": "Not yet implemented, random day given",
-    "day": day})
+    return jsonify({
+		"message": "Not yet implemented, random day given",
+    	"day": day,
+		"test": True
+	})
 
 @app.route('/cluster', methods=[ 'POST' ])
 def cluster():
