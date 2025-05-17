@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def hello():
-	return "Server is ok!"
+	return "Server is ok! 👍"
 
 @app.route('/predict', methods = [ 'POST' ])
 def predict():
