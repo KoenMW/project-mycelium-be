@@ -1,3 +1,3 @@
 ./.venv/Scripts/activate
 
-flask --app flask/app.py --debug run
+python flask/app.py
