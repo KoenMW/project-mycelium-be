@@ -1,4 +1,3 @@
-# segmentor.py
 from ultralytics import YOLO
 import torch
 import numpy as np
@@ -9,7 +8,7 @@ from io import BytesIO
 
 # === INIT YOLO MODEL ON GPU IF AVAILABLE ===
 device = "cuda" if torch.cuda.is_available() else "cpu"
-YOLO_MODEL_PATH = "model/yolo_segmenting_model"
+YOLO_MODEL_PATH = "../model/yolo_segmenting_model.pt"
 yolo = YOLO(YOLO_MODEL_PATH)
 yolo.to(device)
 
@@ -19,7 +18,7 @@ def segment_image(image_bytes):
     image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
     # Predict
-    results = yolo.predict(image, device=0)
+    results = yolo.predict(image, device=device)  # <-- use the global device variable
     masks = results[0].masks
 
     if masks is None or len(masks.data) == 0:
