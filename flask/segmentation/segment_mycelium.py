@@ -8,7 +8,7 @@ from io import BytesIO
 
 # === INIT YOLO MODEL ON GPU IF AVAILABLE ===
 device = "cuda" if torch.cuda.is_available() else "cpu"
-YOLO_MODEL_PATH = "../model/yolo_segmenting_model.pt"
+YOLO_MODEL_PATH = "../models/yolo_segmenting_model.pt"
 yolo = YOLO(YOLO_MODEL_PATH)
 yolo.to(device)
 
