@@ -1,15 +1,16 @@
---extra-index-url https://download.pytorch.org/whl/cpu
+pillow
+opencv-python-headless
+hdbscan
+joblib
+scikit-learn==1.6.1
+psutil
+keras
 flask
 flask-cors
 gunicorn
 torch==2.2.0+cpu
 torchvision==0.17.0+cpu
 ultralytics
-tensorflow==2.15.0
-keras==3.3.3
-pillow
-opencv-python-headless
-hdbscan
-joblib
-scikit-learn
-psutil
+tensorflow
+numpy<2
+--extra-index-url https://download.pytorch.org/whl/cpu
