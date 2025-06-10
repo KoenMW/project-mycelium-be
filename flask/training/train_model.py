@@ -12,11 +12,9 @@ def train_hybrid_model(input_dir, version="v1.0", num_classes=14):
     print(f"🚀 Starting training for version {version}")
     
     IMG_SIZE = (224, 224)
-    BATCH_SIZE = 64
-    EPOCHS = 2     
-    AUTOENCODER_EPOCHS = 2
-    AUTOENCODER_STEPS = 50
-    VALIDATION_STEPS = 20
+    BATCH_SIZE = 32
+    EPOCHS = 1     
+    AUTOENCODER_EPOCHS = 1
     
     CLASSES = [str(i) for i in range(num_classes)]
     SEED = 42
@@ -53,9 +51,16 @@ def train_hybrid_model(input_dir, version="v1.0", num_classes=14):
         for f, label in zip(files, lbls):
             shutil.copy(f, os.path.join(path, label, os.path.basename(f)))
 
-    # Image generators
-    train_gen = ImageDataGenerator(rescale=1./255, rotation_range=10, width_shift_range=0.05,
-                                   height_shift_range=0.05, shear_range=0.05, zoom_range=0.05, horizontal_flip=True)
+    # Data generators for autoencoder training
+    train_gen = ImageDataGenerator(
+        rescale=1./255,
+        rotation_range=15,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        shear_range=0.1,
+        zoom_range=0.1,
+        horizontal_flip=True
+    )
     val_gen = ImageDataGenerator(rescale=1./255)
 
     train_data = train_gen.flow_from_directory(train_dir, target_size=IMG_SIZE, batch_size=BATCH_SIZE,
@@ -63,92 +68,106 @@ def train_hybrid_model(input_dir, version="v1.0", num_classes=14):
     val_data = val_gen.flow_from_directory(val_dir, target_size=IMG_SIZE, batch_size=BATCH_SIZE,
                                            class_mode="categorical", shuffle=False, classes=CLASSES)
 
-    # Calculate class weights (for information, but won't use with generator)
+    # Calculate class weights for use in training
     y_train_labels = train_data.classes
-    class_weights = dict(enumerate(class_weight.compute_class_weight("balanced", classes=np.unique(y_train_labels), y=y_train_labels)))
-    print(f"📊 Class weights calculated: {class_weights}")
+    weights = class_weight.compute_class_weight('balanced', classes=np.unique(y_train_labels), y=y_train_labels)
+    class_weights = dict(enumerate(weights))
+    print(f"📊 Class weights: {class_weights}")
 
     print("🔧 Building autoencoder...")
-    # Simplified Autoencoder
     input_img = Input(shape=(224, 224, 3))
-    x = Conv2D(16, 3, activation="relu", padding="same")(input_img)
-    x = MaxPooling2D(2, padding="same")(x)
-    x = Conv2D(32, 3, activation="relu", padding="same")(x)
-    encoded = MaxPooling2D(2, padding="same")(x)
-    x = Conv2D(32, 3, activation="relu", padding="same")(encoded)
-    x = UpSampling2D(2)(x)
-    x = Conv2D(16, 3, activation="relu", padding="same")(x)
-    x = UpSampling2D(2)(x)
-    decoded = Conv2D(3, 3, activation="sigmoid", padding="same")(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    encoded = MaxPooling2D((2, 2), padding='same')(x)
+    
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(encoded)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
+    
     autoencoder = Model(input_img, decoded)
     encoder = Model(input_img, encoded)
-    autoencoder.compile(optimizer=Adam(1e-3), loss="mse")
+    autoencoder.compile(optimizer='adam', loss='mse')
     
     print("⚡ Training autoencoder...")
     
-    # Fixed autoencoder training generator - return tuple (input, target) where target = input
     def autoencoder_generator(data_generator):
-        for batch_x, batch_y in data_generator:
-            yield batch_x, batch_x  # For autoencoder: input = target
-    
-    # Fixed validation generator for autoencoder
-    def autoencoder_val_generator(data_generator):
         for batch_x, batch_y in data_generator:
             yield batch_x, batch_x
     
     autoencoder.fit(
         autoencoder_generator(train_data), 
-        steps_per_epoch=min(len(train_data), AUTOENCODER_STEPS),
-        validation_data=autoencoder_val_generator(val_data), 
-        validation_steps=min(len(val_data), VALIDATION_STEPS), 
+        steps_per_epoch=len(train_data),
+        validation_data=autoencoder_generator(val_data), 
+        validation_steps=len(val_data), 
         epochs=AUTOENCODER_EPOCHS, 
         verbose=1
     )
 
     print("🧠 Building hybrid model...")
-    # Hybrid model
     vgg = VGG16(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
-    for layer in vgg.layers[:-2]: layer.trainable = False
+    for layer in vgg.layers[:-4]:
+        layer.trainable = False
+    
     vgg_flat = Flatten()(vgg.output)
     encoder_input = Input(shape=(224, 224, 3))
     encoder_out = encoder(encoder_input)
     encoder_flat = Flatten()(encoder_out)
+    
+    # CORRECTED: Match original hybrid architecture
     x = Concatenate()([vgg_flat, encoder_flat])
-    x = Dense(128)(x)
+    x = Dense(256)(x)
     x = BatchNormalization()(x)
     x = Activation("relu")(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.3)(x)
     output = Dense(len(CLASSES), activation="softmax")(x)
+    
     hybrid = Model(inputs=[vgg.input, encoder_input], outputs=output)
     hybrid.compile(optimizer=Adam(1e-4), loss="categorical_crossentropy", metrics=["accuracy"])
 
     print(f"🎯 Training hybrid model ({EPOCHS} epochs)...")
-    # Training with faster dataset creation
+    
+    # ✅ FIXED: Use tf.data.Dataset instead of Python generators to support class_weight
     def make_dual_input_dataset(generator):
-        for batch_x, batch_y in generator:
-            yield (batch_x, batch_x), batch_y
+        """Convert ImageDataGenerator to tf.data.Dataset with dual inputs"""
+        output_signature = (
+            (tf.TensorSpec(shape=(None, 224, 224, 3), dtype=tf.float32),
+             tf.TensorSpec(shape=(None, 224, 224, 3), dtype=tf.float32)),
+            tf.TensorSpec(shape=(None, len(CLASSES)), dtype=tf.float32)
+        )
+        
+        def gen():
+            while True:
+                x, y = next(generator)
+                yield (x, x), y
+        
+        return tf.data.Dataset.from_generator(gen, output_signature=output_signature)
+
+    # Create tf.data.Dataset for training with class weights support
+    AUTOTUNE = tf.data.AUTOTUNE
+    train_dataset = make_dual_input_dataset(train_data).repeat().prefetch(buffer_size=AUTOTUNE)
+    val_dataset = make_dual_input_dataset(val_data).prefetch(buffer_size=AUTOTUNE)
 
     version_dir = f"model_versions/{version}"
     os.makedirs(version_dir, exist_ok=True)
     
-    # Create a custom callback for progress
-    class ProgressCallback(tf.keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            print(f"   Epoch {epoch+1}/{EPOCHS} - Loss: {logs['loss']:.4f} - Val Loss: {logs['val_loss']:.4f}")
-
+    # CORRECTED: Match original callback parameters
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=1),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.3, patience=3, min_lr=1e-7, verbose=1),
-        ModelCheckpoint(os.path.join(version_dir, "hybrid_model.keras"), monitor='val_loss', save_best_only=True, verbose=1),
-        ProgressCallback()
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1),
+        ModelCheckpoint(os.path.join(version_dir, "hybrid_model.keras"), monitor='val_loss', save_best_only=True, verbose=1)
     ]
 
+    # ✅ FIXED: Now class_weight works with tf.data.Dataset
     history = hybrid.fit(
-        make_dual_input_dataset(train_data), 
+        train_dataset,
         steps_per_epoch=len(train_data),
-        validation_data=make_dual_input_dataset(val_data), 
+        validation_data=val_dataset,
         validation_steps=len(val_data),
-        epochs=EPOCHS, 
+        epochs=EPOCHS,
+        class_weight=class_weights,  # ✅ Now works!
         callbacks=callbacks,
         verbose=1
     )
