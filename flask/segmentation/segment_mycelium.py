@@ -7,11 +7,24 @@ from io import BytesIO
 from ultralytics import YOLO
 
 # === YOLO model init ===
-YOLO_MODEL_PATH = "../models/yolo_segmenting_model.pt"
+YOLO_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../models/yolo_segmenting_model.pt")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 yolo = YOLO(YOLO_MODEL_PATH)
 yolo.to(device)
 
+try:
+    if os.path.exists(YOLO_MODEL_PATH):
+        yolo = YOLO(YOLO_MODEL_PATH)
+        print(f"✅ YOLO model loaded from: {YOLO_MODEL_PATH}")
+    else:
+        print(f"⚠️ YOLO model not found at: {YOLO_MODEL_PATH}")
+        print("🔄 Using default YOLOv8 model (will download automatically)")
+        yolo = YOLO('yolov8n-seg.pt')  # Use default YOLOv8 nano segmentation model
+except Exception as e:
+    print(f"❌ Error loading YOLO model: {e}")
+    print("🔄 Falling back to default YOLOv8 model")
+    yolo = YOLO('yolov8n-seg.pt')
+    
 # === 1. Single image segmentatie (API) ===
 def segment_image(image_bytes):
     try:

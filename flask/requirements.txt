@@ -5,13 +5,6 @@ joblib
 scikit-learn==1.6.1
 psutil
 keras
-pillow
-opencv-python-headless
-hdbscan
-joblib
-scikit-learn==1.6.1
-psutil
-keras
 flask
 flask-cors
 gunicorn
