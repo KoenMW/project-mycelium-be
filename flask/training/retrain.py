@@ -47,9 +47,20 @@ def full_retrain_pipeline(upload_folder: str, num_classes: int = 14, quick_mode:
             hour_of_day = int(hour_match.group(4))
             minute = int(hour_match.group(5))
             
-            # Calculate hours since a reference point (you may want to adjust this)
-            # For now, let's use a simple calculation based on day and hour
-            calculated_hour = (day - 1) * 24 + hour_of_day
+            # FIXED: Calculate relative hours from the first timestamp
+            # Store the first timestamp as reference point
+            timestamp = datetime(year, month, day, hour_of_day, minute)
+            
+            # Get or set the reference timestamp for this test
+            if 'reference_timestamp' not in locals():
+                reference_timestamp = timestamp
+                calculated_hour = 0
+                print(f"📅 Setting reference timestamp: {reference_timestamp}")
+            else:
+                # Calculate hours since reference
+                time_diff = timestamp - reference_timestamp
+                calculated_hour = int(time_diff.total_seconds() / 3600)  # Convert to hours
+            
             print(f"📅 Subfolder '{subfolder_name}' -> calculated hour: {calculated_hour}")
         else:
             print(f"⚠️ Could not extract time from subfolder '{subfolder_name}', using hour: 0")
