@@ -5,6 +5,13 @@ joblib
 scikit-learn==1.6.1
 psutil
 keras
+pillow
+opencv-python-headless
+hdbscan
+joblib
+scikit-learn==1.6.1
+psutil
+keras
 flask
 flask-cors
 gunicorn
@@ -13,4 +20,6 @@ torchvision==0.17.0+cpu
 ultralytics
 tensorflow
 numpy<2
+pocketbase
+requests
 --extra-index-url https://download.pytorch.org/whl/cpu
