@@ -4,12 +4,10 @@ from flask_cors import CORS
 from segmentation.segment_mycelium import segment_image, segment_and_save
 from prediction.predictor import predict_growth_stage
 from clustering.clusterer import cluster_image
-from training.retrain import full_retrain_pipeline
 import io
 import sys
 import psutil 
 import os
-from database.data import fetch_pocketbase_data
 import zipfile
 import tempfile
 import shutil
@@ -17,6 +15,12 @@ import threading
 import uuid
 from datetime import datetime
 import glob
+from database.data import fetch_pocketbase_data, upload_to_pocketbase
+import re
+
+# Import background job functions
+from jobs import background_training, background_upload, training_jobs, upload_jobs
+
 app = Flask(__name__)
 
 allowed_origins = [
@@ -25,9 +29,6 @@ allowed_origins = [
 ]
 
 CORS(app, origins=allowed_origins)
-
-# Global dictionary to track training jobs
-training_jobs = {}
 
 def get_available_versions():
     """Get list of available model versions"""
@@ -93,37 +94,6 @@ def get_available_versions():
         })
     
     return versions
-
-def background_training(job_id, upload_folder):
-    """Background training function"""
-    try:
-        print(f"🚀 Starting background training job {job_id}")
-        training_jobs[job_id]["status"] = "running"
-        training_jobs[job_id]["message"] = "Training in progress..."
-        
-        version_dir = full_retrain_pipeline(upload_folder)
-        
-        training_jobs[job_id]["status"] = "completed"
-        training_jobs[job_id]["version"] = os.path.basename(version_dir)
-        training_jobs[job_id]["version_path"] = version_dir
-        training_jobs[job_id]["message"] = f"Training completed successfully! Version: {os.path.basename(version_dir)}"
-        print(f"✅ Background training job {job_id} completed")
-        
-    except Exception as e:
-        training_jobs[job_id]["status"] = "failed"
-        training_jobs[job_id]["error"] = str(e)
-        training_jobs[job_id]["message"] = f"Training failed: {str(e)}"
-        print(f"❌ Background training job {job_id} failed: {str(e)}")
-    
-    finally:
-        # Cleanup temporary directory if it exists
-        temp_dir = training_jobs[job_id].get("temp_dir")
-        if temp_dir and os.path.exists(temp_dir):
-            try:
-                shutil.rmtree(temp_dir)
-                print(f"🧹 Cleaned up temporary directory: {temp_dir}")
-            except Exception as e:
-                print(f"⚠️ Failed to cleanup temp dir {temp_dir}: {e}")
 
 @app.route('/')
 def hello():
@@ -247,88 +217,43 @@ def metadata():
             },
             "retrain": {
                 "method": "POST",
-                "parameters": ["zip_file (required)"],
-                "description": "Retrain models with new data"
+                "parameters": [],
+                "description": "Retrain models with database data"
+            },
+            "upload-data": {
+                "method": "POST",
+                "parameters": ["zip_file (required)", "trainingData (optional, default: true)"],
+                "description": "Upload ZIP file with mycelium data"
+            },
+            "jobs": {
+                "method": "GET",
+                "parameters": [],
+                "description": "List all jobs (training and upload)"
             }
         }
     }), 200
 
-# ... rest of your existing routes remain the same ...
-
+# === Training Endpoints ===
 @app.route("/retrain", methods=["POST"])
-def retrain_with_zip():
-    """Start training with uploaded ZIP file"""
-    if 'zip_file' not in request.files:
-        return jsonify({"error": "No ZIP file uploaded"}), 400
+def retrain_models():
+    """Start retraining using only database data where trainingData=true"""
+    job_id = str(uuid.uuid4())
     
-    zip_file = request.files['zip_file']
-    if zip_file.filename == '' or not zip_file.filename.lower().endswith('.zip'):
-        return jsonify({"error": "Please upload a ZIP file"}), 400
-
-    temp_dir = tempfile.mkdtemp(prefix="retrain_zip_")
+    training_jobs[job_id] = {
+        "status": "started",
+        "created_at": datetime.now().isoformat(),
+        "message": "Training job queued..."
+    }
     
-    try:
-        # Save uploaded ZIP
-        zip_path = os.path.join(temp_dir, "upload.zip")
-        zip_file.save(zip_path)
-        
-        # Extract ZIP
-        extract_dir = os.path.join(temp_dir, "extracted")
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_dir)
-        
-        # Find the main folder (should contain subfolders with timestamp names)
-        main_folder = None
-        for item in os.listdir(extract_dir):
-            item_path = os.path.join(extract_dir, item)
-            if os.path.isdir(item_path):
-                main_folder = item_path
-                break
-        
-        if not main_folder:
-            return jsonify({
-                "error": "No valid folder structure found in ZIP",
-                "required_structure": {
-                    "description": "ZIP file must contain a main folder with timestamp subfolders",
-                    "example": {
-                        "zip_contents": [
-                            "myceliumtest1/",
-                            "myceliumtest1/24-11-12___18-59/",
-                            "myceliumtest1/24-11-12___18-59/1.jpg",
-                            "myceliumtest1/24-11-12___18-59/2.jpg",
-                            "myceliumtest1/24-11-13___19-30/",
-                            "myceliumtest1/24-11-13___19-30/1.jpg",
-                            "myceliumtest1/24-11-13___19-30/2.jpg"
-                        ]
-                    },
-                    "folder_format": "YY-MM-DD___HH-MM (e.g., 24-11-12___18-59)",
-                    "image_format": "1.jpg, 2.jpg, 3.jpg, 4.jpg (for different angles)",
-                    "main_folder": "Can be named anything (e.g., myceliumtest1, experiment_data, etc.)"
-                }
-            }), 400
-        
-        job_id = str(uuid.uuid4())
-        
-        training_jobs[job_id] = {
-            "status": "started",
-            "created_at": datetime.now().isoformat(),
-            "message": "Training job queued...",
-            "temp_dir": temp_dir
-        }
-        
-        thread = threading.Thread(target=background_training, args=(job_id, main_folder))
-        thread.daemon = True
-        thread.start()
-        
-        return jsonify({
-            "status": "started",
-            "job_id": job_id,
-            "message": "Training started in background."
-        }), 202
-        
-    except Exception as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        return jsonify({"error": f"Failed to process ZIP: {str(e)}"}), 500
+    thread = threading.Thread(target=background_training, args=(job_id,))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        "status": "started",
+        "job_id": job_id,
+        "message": "Training started using database training data."
+    }), 202
 
 @app.route("/retrain/status/<job_id>", methods=["GET"])
 def get_training_status(job_id):
@@ -343,6 +268,125 @@ def get_training_status(job_id):
 def list_training_jobs():
     """List all training jobs"""
     return jsonify({"jobs": training_jobs}), 200
+
+# === Upload Endpoints ===
+@app.route("/upload-data", methods=["POST"])
+def upload_data():
+    """Start background upload job"""
+    if 'zip_file' not in request.files:
+        return jsonify({"error": "No ZIP file uploaded"}), 400
+    
+    zip_file = request.files['zip_file']
+    if zip_file.filename == '' or not zip_file.filename.lower().endswith('.zip'):
+        return jsonify({"error": "Please upload a ZIP file"}), 400
+
+    # Get trainingData flag from form
+    is_training_data = request.form.get('trainingData', 'true').lower() == 'true'
+    
+    # Create job
+    job_id = str(uuid.uuid4())
+    upload_id = job_id[:8]
+    temp_dir = tempfile.mkdtemp(prefix=f"upload_data_{upload_id}_")
+    
+    # Save uploaded ZIP
+    zip_path = os.path.join(temp_dir, "upload.zip")
+    zip_file.save(zip_path)
+    
+    # Initialize job tracking
+    upload_jobs[job_id] = {
+        "status": "started",
+        "created_at": datetime.now().isoformat(),
+        "upload_id": upload_id,
+        "training_data": is_training_data,
+        "progress": 0,
+        "message": "Upload job queued...",
+        "total_images": 0,
+        "uploaded_count": 0,
+        "failed_count": 0
+    }
+    
+    # Start background thread
+    thread = threading.Thread(
+        target=background_upload, 
+        args=(job_id, zip_path, is_training_data, temp_dir)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        "status": "started",
+        "job_id": job_id,
+        "upload_id": upload_id,
+        "message": "Upload started in background. Use job_id to track progress."
+    }), 202
+
+@app.route("/upload/status/<job_id>", methods=["GET"])
+def get_upload_status(job_id):
+    """Check upload job status"""
+    if job_id not in upload_jobs:
+        return jsonify({"error": "Job ID not found"}), 404
+    
+    job_info = upload_jobs[job_id]
+    return jsonify(job_info), 200
+
+@app.route("/upload/jobs", methods=["GET"])
+def list_upload_jobs():
+    """List all upload jobs"""
+    return jsonify({"jobs": upload_jobs}), 200
+
+# === General Jobs Endpoint ===
+@app.route("/jobs", methods=["GET"])
+def list_all_jobs():
+    """List all jobs (training and upload) with unified format"""
+    all_jobs = []
+    
+    # Add training jobs
+    for job_id, job_info in training_jobs.items():
+        unified_job = {
+            "job_id": job_id,
+            "job_type": "training",
+            "status": job_info.get("status"),
+            "created_at": job_info.get("created_at"),
+            "message": job_info.get("message"),
+            "progress": job_info.get("progress", None),  # Training jobs don't have progress
+            "details": {
+                "version": job_info.get("version"),
+                "version_path": job_info.get("version_path"),
+                "error": job_info.get("error")
+            }
+        }
+        all_jobs.append(unified_job)
+    
+    # Add upload jobs
+    for job_id, job_info in upload_jobs.items():
+        unified_job = {
+            "job_id": job_id,
+            "job_type": "upload",
+            "status": job_info.get("status"),
+            "created_at": job_info.get("created_at"),
+            "message": job_info.get("message"),
+            "progress": job_info.get("progress"),
+            "details": {
+                "upload_id": job_info.get("upload_id"),
+                "training_data": job_info.get("training_data"),
+                "total_images": job_info.get("total_images"),
+                "uploaded_count": job_info.get("uploaded_count"),
+                "failed_count": job_info.get("failed_count"),
+                "test_number": job_info.get("test_number"),
+                "error": job_info.get("error")
+            }
+        }
+        all_jobs.append(unified_job)
+    
+    # Sort by creation time (newest first)
+    all_jobs.sort(key=lambda x: x["created_at"], reverse=True)
+    
+    return jsonify({
+        "total_jobs": len(all_jobs),
+        "training_jobs": len(training_jobs),
+        "upload_jobs": len(upload_jobs),
+        "jobs": all_jobs
+    }), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, threaded=True)
