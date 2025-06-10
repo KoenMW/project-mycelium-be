@@ -158,6 +158,7 @@ def predict():
     })
 
 @app.route('/cluster', methods=['POST'])
+@app.route('/cluster', methods=['POST'])
 def cluster():
     if 'file' not in request.files:
         return jsonify({ "error": "No file uploaded" }), 400
