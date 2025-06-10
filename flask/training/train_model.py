@@ -8,14 +8,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 from tensorflow.keras.optimizers import Adam
 
-def train_hybrid_model(input_dir, version="v1.0", num_classes=14):
+def train_hybrid_model(input_dir, version="v1.0", num_classes=14, hybrid_epochs=1, autoencoder_epochs=1):
     print(f"🚀 Starting training for version {version}")
+    print(f"📊 Training configuration: Autoencoder={autoencoder_epochs} epochs, Hybrid={hybrid_epochs} epochs")
     
     IMG_SIZE = (224, 224)
     BATCH_SIZE = 32
-    EPOCHS = 1     
-    AUTOENCODER_EPOCHS = 1
-    
+    EPOCHS = hybrid_epochs        
+    AUTOENCODER_EPOCHS = autoencoder_epochs  
     CLASSES = [str(i) for i in range(num_classes)]
     SEED = 42
     np.random.seed(SEED)

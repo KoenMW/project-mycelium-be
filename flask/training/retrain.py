@@ -7,12 +7,14 @@ from training.train_model import train_hybrid_model
 from training.cluster_retrainer import retrain_cluster_model
 from datetime import datetime
 
-def full_retrain_pipeline(num_classes: int = 14, job_temp_dir: str = None):
+def full_retrain_pipeline(num_classes: int = 14, job_temp_dir: str = None, hybrid_epochs: int = 1, autoencoder_epochs: int = 1):
     """
     Retrain models using only database data where trainingData=true
     Args:
         num_classes: Number of classification classes
         job_temp_dir: Temporary directory for this specific job
+        hybrid_epochs: Number of epochs for hybrid model training (default: 1)
+        autoencoder_epochs: Number of epochs for autoencoder training (default: 1)
     """
     if job_temp_dir is None:
         job_temp_dir = "."
@@ -35,10 +37,16 @@ def full_retrain_pipeline(num_classes: int = 14, job_temp_dir: str = None):
     print("📊 Splitting images by hour for classification...")
     split_by_hour(training_data_dir, labeled_data_dir, hour_split=24)
 
-    # 3. Train prediction model
-    print("🧠 Training classification model...")
+    # 3. Train prediction model with custom epochs
+    print(f"🧠 Training classification model... (AE: {autoencoder_epochs}, Hybrid: {hybrid_epochs})")
     version = f"v{uuid.uuid4().hex[:6]}"
-    version_dir = train_hybrid_model(labeled_data_dir, version=version, num_classes=num_classes)
+    version_dir = train_hybrid_model(
+        labeled_data_dir, 
+        version=version, 
+        num_classes=num_classes,
+        hybrid_epochs=hybrid_epochs,
+        autoencoder_epochs=autoencoder_epochs
+    )
 
     # 4. Train clustering model
     print("🔗 Training clustering model...")

@@ -218,8 +218,11 @@ def metadata():
             },
             "retrain": {
                 "method": "POST",
-                "parameters": [],
-                "description": "Retrain models with database data"
+                "parameters": [
+                    "hybrid_epochs (optional, default: 1, range: 1-500)",
+                    "autoencoder_epochs (optional, default: 1, range: 1-100)"
+                ],
+                "description": "Retrain models with database data and custom epoch counts"
             },
             "upload-data": {
                 "method": "POST",
@@ -240,20 +243,38 @@ def retrain_models():
     """Start retraining using only database data where trainingData=true"""
     job_id = str(uuid.uuid4())
     
+    # Get epoch parameters from request JSON or form data
+    request_data = request.get_json() if request.is_json else request.form
+    
+    # Default values set to 1 as requested
+    hybrid_epochs = int(request_data.get('hybrid_epochs', 1))
+    autoencoder_epochs = int(request_data.get('autoencoder_epochs', 1))
+    
+    # Validate epoch parameters
+    if hybrid_epochs < 1 or hybrid_epochs > 500:
+        return jsonify({"error": "hybrid_epochs must be between 1 and 500"}), 400
+    
+    if autoencoder_epochs < 1 or autoencoder_epochs > 100:
+        return jsonify({"error": "autoencoder_epochs must be between 1 and 100"}), 400
+    
     training_jobs[job_id] = {
         "status": "started",
         "created_at": datetime.now().isoformat(),
-        "message": "Training job queued..."
+        "message": f"Training job queued... (Autoencoder: {autoencoder_epochs} epochs, Hybrid: {hybrid_epochs} epochs)",
+        "hybrid_epochs": hybrid_epochs,
+        "autoencoder_epochs": autoencoder_epochs
     }
     
-    thread = threading.Thread(target=background_training, args=(job_id,))
+    thread = threading.Thread(target=background_training, args=(job_id, hybrid_epochs, autoencoder_epochs))
     thread.daemon = True
     thread.start()
     
     return jsonify({
         "status": "started",
         "job_id": job_id,
-        "message": "Training started using database training data."
+        "message": f"Training started using database training data. Autoencoder: {autoencoder_epochs} epochs, Hybrid: {hybrid_epochs} epochs",
+        "hybrid_epochs": hybrid_epochs,
+        "autoencoder_epochs": autoencoder_epochs
     }), 202
 
 @app.route("/retrain/status/<job_id>", methods=["GET"])
