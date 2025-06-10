@@ -8,25 +8,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 from tensorflow.keras.optimizers import Adam
 
-def train_hybrid_model(input_dir, version="v1.0", num_classes=14, quick_mode=False):
+def train_hybrid_model(input_dir, version="v1.0", num_classes=14):
     print(f"🚀 Starting training for version {version}")
-    if quick_mode:
-        print("⚡ QUICK MODE ENABLED - Using minimal settings for fast training")
     
     IMG_SIZE = (224, 224)
-    BATCH_SIZE = 64  # Increased for faster training
-    
-    # Quick mode settings
-    if quick_mode:
-        EPOCHS = 10      # Very short for testing
-        AUTOENCODER_EPOCHS = 3
-        AUTOENCODER_STEPS = 10
-        VALIDATION_STEPS = 5
-    else:
-        EPOCHS = 80     
-        AUTOENCODER_EPOCHS = 20
-        AUTOENCODER_STEPS = 50
-        VALIDATION_STEPS = 20
+    BATCH_SIZE = 64
+    EPOCHS = 2     
+    AUTOENCODER_EPOCHS = 2
+    AUTOENCODER_STEPS = 50
+    VALIDATION_STEPS = 20
     
     CLASSES = [str(i) for i in range(num_classes)]
     SEED = 42
@@ -79,11 +69,11 @@ def train_hybrid_model(input_dir, version="v1.0", num_classes=14, quick_mode=Fal
     print(f"📊 Class weights calculated: {class_weights}")
 
     print("🔧 Building autoencoder...")
-    # Simplified Autoencoder (faster training)
+    # Simplified Autoencoder
     input_img = Input(shape=(224, 224, 3))
-    x = Conv2D(16, 3, activation="relu", padding="same")(input_img)  # Reduced filters
+    x = Conv2D(16, 3, activation="relu", padding="same")(input_img)
     x = MaxPooling2D(2, padding="same")(x)
-    x = Conv2D(32, 3, activation="relu", padding="same")(x)  # Reduced filters
+    x = Conv2D(32, 3, activation="relu", padding="same")(x)
     encoded = MaxPooling2D(2, padding="same")(x)
     x = Conv2D(32, 3, activation="relu", padding="same")(encoded)
     x = UpSampling2D(2)(x)
@@ -94,7 +84,7 @@ def train_hybrid_model(input_dir, version="v1.0", num_classes=14, quick_mode=Fal
     encoder = Model(input_img, encoded)
     autoencoder.compile(optimizer=Adam(1e-3), loss="mse")
     
-    print(f"⚡ Training autoencoder ({'QUICK' if quick_mode else 'NORMAL'})...")
+    print("⚡ Training autoencoder...")
     
     # Fixed autoencoder training generator - return tuple (input, target) where target = input
     def autoencoder_generator(data_generator):
@@ -118,13 +108,13 @@ def train_hybrid_model(input_dir, version="v1.0", num_classes=14, quick_mode=Fal
     print("🧠 Building hybrid model...")
     # Hybrid model
     vgg = VGG16(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
-    for layer in vgg.layers[:-2]: layer.trainable = False  # Fine-tune more layers
+    for layer in vgg.layers[:-2]: layer.trainable = False
     vgg_flat = Flatten()(vgg.output)
     encoder_input = Input(shape=(224, 224, 3))
     encoder_out = encoder(encoder_input)
     encoder_flat = Flatten()(encoder_out)
     x = Concatenate()([vgg_flat, encoder_flat])
-    x = Dense(128)(x)  # Reduced size
+    x = Dense(128)(x)
     x = BatchNormalization()(x)
     x = Activation("relu")(x)
     x = Dropout(0.5)(x)
@@ -146,29 +136,19 @@ def train_hybrid_model(input_dir, version="v1.0", num_classes=14, quick_mode=Fal
         def on_epoch_end(self, epoch, logs=None):
             print(f"   Epoch {epoch+1}/{EPOCHS} - Loss: {logs['loss']:.4f} - Val Loss: {logs['val_loss']:.4f}")
 
-    # Quick mode callbacks - more aggressive early stopping
-    if quick_mode:
-        callbacks = [
-            EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True, verbose=1),
-            ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1, min_lr=1e-6, verbose=1),
-            ProgressCallback()
-        ]
-    else:
-        callbacks = [
-            EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True, verbose=1),
-            ReduceLROnPlateau(monitor='val_loss', factor=0.3, patience=3, min_lr=1e-7, verbose=1),
-            ModelCheckpoint(os.path.join(version_dir, "hybrid_model.keras"), monitor='val_loss', save_best_only=True, verbose=1),
-            ProgressCallback()
-        ]
+    callbacks = [
+        EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=1),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.3, patience=3, min_lr=1e-7, verbose=1),
+        ModelCheckpoint(os.path.join(version_dir, "hybrid_model.keras"), monitor='val_loss', save_best_only=True, verbose=1),
+        ProgressCallback()
+    ]
 
-    # REMOVED class_weight parameter since it's not supported with generators
     history = hybrid.fit(
         make_dual_input_dataset(train_data), 
         steps_per_epoch=len(train_data),
         validation_data=make_dual_input_dataset(val_data), 
         validation_steps=len(val_data),
         epochs=EPOCHS, 
-        # class_weight=class_weights,  # REMOVED - not supported with generators
         callbacks=callbacks,
         verbose=1
     )

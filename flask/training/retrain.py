@@ -7,7 +7,7 @@ from segmentation.segment_mycelium import segment_and_save
 import os, shutil, re
 from datetime import datetime
 
-def full_retrain_pipeline(upload_folder: str, num_classes: int = 14, quick_mode: bool = False):
+def full_retrain_pipeline(upload_folder: str, num_classes: int = 14):
     assert os.path.exists(upload_folder), f"❌ Provided upload folder does not exist: {upload_folder}"
 
     # 1. Fetch PocketBase data (already segmented)
@@ -30,6 +30,29 @@ def full_retrain_pipeline(upload_folder: str, num_classes: int = 14, quick_mode:
         test_number = 1
     
     # Process uploaded images - segment them and give proper names
+    reference_timestamp = None
+    
+    # Find all timestamps first to determine reference
+    all_timestamps = []
+    for root, dirs, files in os.walk(upload_folder):
+        if root == upload_folder:
+            continue
+        subfolder_name = os.path.basename(root)
+        hour_match = re.search(r'(\d{2})-(\d{2})-(\d{2})___(\d{2})-(\d{2})', subfolder_name)
+        if hour_match:
+            year = int(f"20{hour_match.group(1)}")
+            month = int(hour_match.group(2))
+            day = int(hour_match.group(3))
+            hour_of_day = int(hour_match.group(4))
+            minute = int(hour_match.group(5))
+            timestamp = datetime(year, month, day, hour_of_day, minute)
+            all_timestamps.append(timestamp)
+    
+    if all_timestamps:
+        reference_timestamp = min(all_timestamps)
+        print(f"📅 Reference timestamp set to: {reference_timestamp}")
+    
+    # Process uploaded images - segment them and give proper names
     for root, dirs, files in os.walk(upload_folder):
         # Skip the main folder, only process subfolders
         if root == upload_folder:
@@ -39,27 +62,17 @@ def full_retrain_pipeline(upload_folder: str, num_classes: int = 14, quick_mode:
         subfolder_name = os.path.basename(root)
         hour_match = re.search(r'(\d{2})-(\d{2})-(\d{2})___(\d{2})-(\d{2})', subfolder_name)
         
-        if hour_match:
-            # Convert timestamp to hours since start
-            year = int(f"20{hour_match.group(1)}")  # Assuming 20xx format
+        if hour_match and reference_timestamp:
+            year = int(f"20{hour_match.group(1)}")
             month = int(hour_match.group(2))
             day = int(hour_match.group(3))
             hour_of_day = int(hour_match.group(4))
             minute = int(hour_match.group(5))
             
-            # FIXED: Calculate relative hours from the first timestamp
-            # Store the first timestamp as reference point
-            timestamp = datetime(year, month, day, hour_of_day, minute)
-            
-            # Get or set the reference timestamp for this test
-            if 'reference_timestamp' not in locals():
-                reference_timestamp = timestamp
-                calculated_hour = 0
-                print(f"📅 Setting reference timestamp: {reference_timestamp}")
-            else:
-                # Calculate hours since reference
-                time_diff = timestamp - reference_timestamp
-                calculated_hour = int(time_diff.total_seconds() / 3600)  # Convert to hours
+            # Calculate hours since reference timestamp
+            current_timestamp = datetime(year, month, day, hour_of_day, minute)
+            time_diff = current_timestamp - reference_timestamp
+            calculated_hour = int(time_diff.total_seconds() / 3600)  # Convert to hours
             
             print(f"📅 Subfolder '{subfolder_name}' -> calculated hour: {calculated_hour}")
         else:
@@ -140,7 +153,7 @@ def full_retrain_pipeline(upload_folder: str, num_classes: int = 14, quick_mode:
     # 5. Train prediction model (classifier)
     print("🧠 Training classification model...")
     version = f"v{uuid.uuid4().hex[:6]}"
-    version_dir = train_hybrid_model("labeled_training_data", version=version, num_classes=num_classes, quick_mode=quick_mode)
+    version_dir = train_hybrid_model("labeled_training_data", version=version, num_classes=num_classes)
 
     # 6. Train clustering model using all segmented images
     print("🔗 Training clustering model...")
