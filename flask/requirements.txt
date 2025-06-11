@@ -1,28 +1,18 @@
-# Core packages
+pillow
+opencv-python-headless==4.9.0.80
+hdbscan
+joblib
+scikit-learn==1.6.1
+psutil
+keras
 flask
 flask-cors
 gunicorn
-requests
-psutil
-pillow
-numpy<2
-
-# ML/AI
 torch==2.2.0+cpu
 torchvision==0.17.0+cpu
+ultralytics
 tensorflow
-keras
-scikit-learn==1.6.1
-hdbscan
-joblib
-
-# OpenCV (headless version only)
-opencv-python-headless==4.9.0.80  # You can update this to the latest if needed
-
-# Optional: ultralytics, installed separately to avoid deps conflict
-# Do NOT include ultralytics here if managing manually in GitHub Actions
-# Otherwise, include this line and add --no-deps in pip install step
-# ultralytics
-
-# Extra index for torch CPU builds
+numpy<2
+pocketbase
+requests
 --extra-index-url https://download.pytorch.org/whl/cpu
