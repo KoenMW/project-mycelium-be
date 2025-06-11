@@ -32,6 +32,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r flask/requirements.txt
 
+      - name: Install Ultralytics separately (no dependencies)
+        run: |
+          pip install ultralytics --no-deps
+
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
       - name: Zip artifact for deployment
