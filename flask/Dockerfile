@@ -1,6 +1,6 @@
-FROM python:3.9.2-slim
+FROM python:3.11.9-slim
 
-# Install system dependencies (including OpenCV requirements)
+# Install system dependencies (minimal set for headless OpenCV)
 RUN apt-get update && apt-get install -y \
     curl \
     gcc \
@@ -12,18 +12,9 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     libhdf5-dev \
     cmake \
-    libgl1-mesa-glx \
     libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
     libgomp1 \
-    libglib2.0-dev \
-    libgtk2.0-dev \
     pkg-config \
-    libavcodec-dev \
-    libavformat-dev \
-    libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create nonroot user
@@ -34,8 +25,10 @@ WORKDIR /home/app
 COPY flask/requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+# Install ultralytics without dependencies to avoid OpenCV conflict
+RUN pip install ultralytics --no-deps
 
-# Copy models from project root
+# Copy models from parent directory
 COPY models/ ./models/
 
 # Switch to nonroot user and copy Flask app files
