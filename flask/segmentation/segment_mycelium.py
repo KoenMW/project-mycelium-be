@@ -7,7 +7,7 @@ from io import BytesIO
 from ultralytics import YOLO
 
 # === YOLO model init ===
-YOLO_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../models/yolo_segmenting_model.pt")
+YOLO_MODEL_PATH = "../models/yolo_segmenting_model.pt"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 yolo = YOLO(YOLO_MODEL_PATH)
 yolo.to(device)

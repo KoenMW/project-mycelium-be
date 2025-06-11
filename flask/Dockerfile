@@ -15,6 +15,12 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libgomp1 \
     pkg-config \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgl1-mesa-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create nonroot user
@@ -25,8 +31,6 @@ WORKDIR /home/app
 COPY flask/requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-# Install ultralytics without dependencies to avoid OpenCV conflict
-RUN pip install ultralytics --no-deps
 
 # Copy models from parent directory
 COPY models/ ./models/

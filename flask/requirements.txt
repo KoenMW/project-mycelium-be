@@ -17,12 +17,16 @@ hdbscan
 joblib
 
 # OpenCV (headless version only)
-opencv-python-headless==4.9.0.80  # You can update this to the latest if needed
+opencv-python-headless==4.9.0.80
 
-# Optional: ultralytics, installed separately to avoid deps conflict
-# Do NOT include ultralytics here if managing manually in GitHub Actions
-# Otherwise, include this line and add --no-deps in pip install step
-# ultralytics
+# Ultralytics dependencies (since we install ultralytics with --no-deps)
+tqdm
+pyyaml
+matplotlib
+seaborn
+pandas
+scipy
+ultralytics
 
 # Extra index for torch CPU builds
 --extra-index-url https://download.pytorch.org/whl/cpu
