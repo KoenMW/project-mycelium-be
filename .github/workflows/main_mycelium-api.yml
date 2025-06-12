@@ -11,10 +11,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -30,13 +30,56 @@ jobs:
           source venv/bin/activate
 
       - name: Install dependencies
-        run: pip install -r flask/requirements.txt
+        run: |
+          source venv/bin/activate
+          pip install -r flask/requirements.txt
 
       - name: Install Ultralytics separately (no dependencies)
         run: |
+          source venv/bin/activate
           pip install ultralytics --no-deps
 
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+      - name: Install test dependencies
+        run: |
+          source venv/bin/activate
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          source venv/bin/activate
+          cd flask
+          python -m pytest tests/ -v --tb=short --maxfail=5
+        env:
+          PYTHONPATH: .
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test  # Build only runs if tests pass
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+
+      - name: Install dependencies
+        run: |
+          source venv/bin/activate
+          pip install -r flask/requirements.txt
+
+      - name: Install Ultralytics separately (no dependencies)
+        run: |
+          source venv/bin/activate
+          pip install ultralytics --no-deps
 
       - name: Zip artifact for deployment
         run: cd flask && zip -r ../release.zip .
@@ -51,7 +94,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [test, build]  # Deploy only runs if both test and build pass
     environment:
       name: "Production"
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
