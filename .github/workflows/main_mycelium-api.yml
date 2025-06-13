@@ -42,13 +42,13 @@ jobs:
       - name: Install test dependencies
         run: |
           source venv/bin/activate
-          pip install pytest pytest-cov
+          pip install pytest-mock pytest-fixtures pytest-flask pytest-requests-mock
 
       - name: Run tests
         run: |
           source venv/bin/activate
           cd flask
-          python -m pytest tests/ -v --tb=short --maxfail=5
+          python -m pytest tests/ -v --tb=short
         env:
           PYTHONPATH: .
 
@@ -60,8 +60,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Set up Python version
         uses: actions/setup-python@v5
