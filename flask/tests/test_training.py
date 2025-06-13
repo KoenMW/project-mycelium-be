@@ -115,8 +115,7 @@ class TestTrainHybridModel:
         with pytest.raises(ValueError, match="No training images found"):
             train_hybrid_model(temp_training_dir, version="test", num_classes=2)
 
-    @patch('prediction.predictor.load_model')
-    def test_train_hybrid_model_file_collection(self, mock_load_model, temp_training_dir, sample_image_data):
+    def test_train_hybrid_model_file_collection(self, temp_training_dir, sample_image_data):
         """Test file collection logic without model training"""
         # Create test directory structure
         for class_idx in range(3):
@@ -161,6 +160,7 @@ class TestTrainHybridModel:
 class TestClusterRetrainer:
     """Test clustering model retraining"""
     
+    @patch.dict(os.environ, {'SKIP_MODEL_LOADING': 'false'})
     @patch('training.cluster_retrainer.load_model')
     @patch('training.cluster_retrainer.cv2.imread')
     @patch('training.cluster_retrainer.cv2.imwrite')
@@ -218,6 +218,7 @@ class TestClusterRetrainer:
             # Verify labels returned
             assert len(labels) == len(test_files)
 
+    @patch.dict(os.environ, {'SKIP_MODEL_LOADING': 'false'})
     @patch('training.cluster_retrainer.load_model')
     @patch('training.cluster_retrainer.joblib.dump')
     def test_retrain_cluster_model_no_valid_files(self, mock_joblib_dump, mock_load_model, temp_training_dir):
