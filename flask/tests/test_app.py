@@ -76,13 +76,9 @@ class TestBasicEndpoints:
 class TestPredictionEndpoint:
     """Test prediction endpoint"""
     
-    @patch('app.segment_image')
     @patch('app.predict_growth_stage')
-    def test_predict_success(self, mock_predict, mock_segment, client, sample_image):
+    def test_predict_success(self, mock_predict, client, sample_image):
         """Test successful prediction"""
-        # Mock segmentation
-        mock_segment.return_value = (io.BytesIO(b'segmented_image'), None)
-        
         # Mock prediction
         mock_predict.return_value = (
             {"predicted_class": "2", "confidence": 0.85, "version": "default"},
@@ -119,24 +115,9 @@ class TestPredictionEndpoint:
         assert 'error' in data
         assert 'Empty filename' in data['error']
 
-    @patch('app.segment_image')
-    def test_predict_segmentation_error(self, mock_segment, client, sample_image):
-        """Test prediction with segmentation error"""
-        mock_segment.return_value = (None, "Segmentation failed")
-        
-        response = client.post('/predict', data={
-            'file': (sample_image, 'test.jpg')
-        })
-        
-        assert response.status_code == 400
-        data = response.get_json()
-        assert 'error' in data
-
-    @patch('app.segment_image')
     @patch('app.predict_growth_stage')
-    def test_predict_prediction_error(self, mock_predict, mock_segment, client, sample_image):
+    def test_predict_prediction_error(self, mock_predict, client, sample_image):
         """Test prediction with prediction error"""
-        mock_segment.return_value = (io.BytesIO(b'segmented_image'), None)
         mock_predict.return_value = (None, "Prediction failed")
         
         response = client.post('/predict', data={
@@ -442,29 +423,29 @@ class TestErrorHandling:
         response = client.get('/predict')  # Should be POST
         assert response.status_code == 405
 
-    @patch('app.segment_image')
-    def test_large_file_handling(self, mock_segment, client):
+    @patch('app.predict_growth_stage')
+    def test_large_file_handling(self, mock_predict, client):
         """Test handling of large files"""
         # Create a large fake image
         large_data = b'x' * (1024)  # Smaller test file to avoid memory issues
         
-        # Mock segmentation to return error instead of raising exception
-        mock_segment.return_value = (None, "File too large")
+        # Mock prediction to return error instead of raising exception
+        mock_predict.return_value = (None, "File too large")
         
         response = client.post('/predict', data={
             'file': (io.BytesIO(large_data), 'large.jpg')
         })
         
         # Should handle the error gracefully
-        assert response.status_code == 400
+        assert response.status_code == 500
         data = response.get_json()
         assert 'error' in data
         assert 'File too large' in data['error']
 
     def test_predict_exception_handling(self, client, sample_image):
         """Test prediction with unexpected exception"""
-        with patch('app.segment_image') as mock_segment:
-            mock_segment.side_effect = Exception("Unexpected error")
+        with patch('app.predict_growth_stage') as mock_predict:
+            mock_predict.side_effect = Exception("Unexpected error")
             
             # The Flask app should catch this exception and return 500
             try:
@@ -477,7 +458,6 @@ class TestErrorHandling:
                 # If exception bubbles up, that's also acceptable for this test
                 # since we're testing that large files don't crash the server
                 pass
-
 
 class TestJobIntegration:
     """Integration tests for job workflows"""
