@@ -42,7 +42,7 @@ jobs:
       - name: Install test dependencies
         run: |
           source venv/bin/activate
-          pip install pytest-mock pytest-fixtures pytest-flask pytest-requests-mock
+          pip install pytest-mock pytest-fixtures pytest-flask requests-mock
 
       - name: Run tests
         run: |
