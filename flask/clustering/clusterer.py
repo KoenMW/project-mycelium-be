@@ -9,9 +9,9 @@ from sklearn.decomposition import PCA
 from hdbscan.prediction import approximate_predict
 
 # === Config ===
-DEFAULT_ENCODER_PATH = "models/encoder_model.keras"
-DEFAULT_CLUSTERER_PATH = "models/hdbscan_clusterer.pkl"
-DEFAULT_PCA_PATH = "models/pca_model.pkl"
+DEFAULT_ENCODER_PATH = "../models/encoder_model.keras"
+DEFAULT_CLUSTERER_PATH = "../models/hdbscan_clusterer.pkl"
+DEFAULT_PCA_PATH = "../models/pca_model.pkl"
 IMG_SIZE = (224, 224)
 MAX_HOUR = 360
 PCA_COMPONENTS = 100  
