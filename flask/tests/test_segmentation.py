@@ -42,18 +42,18 @@ class TestSegmentation:
         # Create proper mock tensor structure
         mock_tensor = Mock()
         mock_tensor.cpu.return_value.numpy.return_value = np.ones((50, 50))
-        
+    
         # Mock YOLO results
         mock_mask = Mock()
         mock_mask.data = [mock_tensor]  # List of mock tensors
-        
+    
         mock_result = Mock()
         mock_result.masks = mock_mask
         mock_yolo.predict.return_value = [mock_result]
-        
+
         # Test the function
         result, error = segment_image(sample_image_bytes)
-        
+
         # Assertions
         assert error is None
         assert result is not None

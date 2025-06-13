@@ -115,7 +115,8 @@ class TestTrainHybridModel:
         with pytest.raises(ValueError, match="No training images found"):
             train_hybrid_model(temp_training_dir, version="test", num_classes=2)
 
-    def test_train_hybrid_model_file_collection(self, temp_training_dir, sample_image_data):
+    @patch('prediction.predictor.load_model')
+    def test_train_hybrid_model_file_collection(self, mock_load_model, temp_training_dir, sample_image_data):
         """Test file collection logic without model training"""
         # Create test directory structure
         for class_idx in range(3):
@@ -125,7 +126,7 @@ class TestTrainHybridModel:
             # Mix of valid and invalid files
             valid_files = [f"valid_{i}.jpg" for i in range(2)]
             invalid_files = [f"invalid_{i}.txt" for i in range(2)] + [f"bad_{i}.doc" for i in range(2)]
-            
+        
             for filename in valid_files + invalid_files:
                 filepath = os.path.join(class_dir, filename)
                 with open(filepath, 'wb') as f:
@@ -133,27 +134,27 @@ class TestTrainHybridModel:
                         f.write(sample_image_data)
                     else:
                         f.write(b'not an image')
-        
+
         # Test the file collection part by using a minimal mock
         with patch('training.train_model.train_test_split') as mock_split:
             mock_split.return_value = ([], [], [], [])
-            
+
             # This should collect files but fail during training setup
             try:
                 train_hybrid_model(temp_training_dir, version="file_test", num_classes=3)
             except:
                 pass  # Expected to fail after file collection
-            
+                
             # Verify train_test_split was called - indicates files were collected
             if mock_split.called:
                 call_args = mock_split.call_args[0]
                 filepaths = call_args[0]
                 labels = call_args[1]
-                
+
                 # Should have collected 6 valid image files (2 per class * 3 classes)
                 assert len(filepaths) == 6
                 assert len(labels) == 6
-                
+
                 # All files should be .jpg files
                 assert all(fp.endswith('.jpg') for fp in filepaths)
 

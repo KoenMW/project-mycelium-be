@@ -55,18 +55,18 @@ class TestClustering:
         mock_encoder = Mock()
         mock_clusterer = Mock()
         mock_pca = Mock()
-        
+
         mock_load_model.return_value = mock_encoder
         mock_joblib_load.side_effect = [mock_clusterer, mock_pca]
-        
+    
         # Clear the model cache first
         from clustering.clusterer import _encoders, _clusterers, _pcas
         _encoders.clear()
         _clusterers.clear()
         _pcas.clear()
-        
+    
         encoder, clusterer, pca = load_clustering_models("default")
-        
+    
         assert encoder == mock_encoder
         assert clusterer == mock_clusterer
         assert pca == mock_pca

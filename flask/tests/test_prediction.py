@@ -39,13 +39,13 @@ class TestPrediction:
         mock_exists.return_value = True
         mock_model = Mock()
         mock_load_model.return_value = mock_model
-        
+    
         # Clear the model cache first
         from prediction.predictor import _models
         _models.clear()
-        
+    
         result = load_prediction_model("default")
-        
+    
         assert result == mock_model
         mock_load_model.assert_called_once()
         assert "default" in _models
