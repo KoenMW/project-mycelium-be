@@ -6,7 +6,7 @@ import io
 import os
 
 # === Constants ===
-DEFAULT_MODEL_PATH = "../models/best_hybrid_model.keras"
+DEFAULT_MODEL_PATH = "models/best_hybrid_model.keras"
 IMG_SIZE = (224, 224)
 CLASSES = [str(i) for i in range(14)]  # 0–13
 
