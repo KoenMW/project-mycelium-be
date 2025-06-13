@@ -8,11 +8,8 @@ keras
 flask
 flask-cors
 gunicorn
-torch==2.2.0+cpu
-torchvision==0.17.0+cpu
-ultralytics
 tensorflow
 numpy<2
 pocketbase
 requests
---extra-index-url https://download.pytorch.org/whl/cpu
+pytest

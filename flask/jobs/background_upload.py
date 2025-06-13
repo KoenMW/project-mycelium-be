@@ -4,7 +4,6 @@ import tempfile
 import shutil
 import re
 from datetime import datetime
-from segmentation.segment_mycelium import segment_and_save
 from prediction.predictor import predict_growth_stage
 from database.data import upload_to_pocketbase
 
@@ -113,13 +112,13 @@ def extract_timestamp_info(folder_path):
 
 def background_upload(job_id, zip_file_path, is_training_data, temp_dir):
     """
-    Process uploaded ZIP file in the background, segmenting images and uploading to database.
+    Process uploaded ZIP file in the background, uploading images to database.
     
     This function handles the complete pipeline for processing experimental image data:
     1. Extract and analyze ZIP file structure
     2. Recursively collect all image files
     3. Extract experimental metadata (test number, timestamps)
-    4. Process each image through segmentation and prediction
+    4. Process each image through prediction
     5. Upload processed data to the database
     
     Args:
@@ -183,10 +182,6 @@ def background_upload(job_id, zip_file_path, is_training_data, temp_dir):
         upload_jobs[job_id]["total_images"] = len(all_images)
         upload_jobs[job_id]["message"] = f"Processing {len(all_images)} images..."
         
-        # Create directory for temporary segmented images
-        segmented_dir = os.path.join(temp_dir, "segmented")
-        os.makedirs(segmented_dir, exist_ok=True)
-        
         # Initialize processing counters
         uploaded_count = 0
         failed_count = 0
@@ -216,53 +211,39 @@ def background_upload(job_id, zip_file_path, is_training_data, temp_dir):
             else:
                 calculated_hour = 0  # Fallback if no timestamp found
             
-            # === Image Segmentation ===
-            # Create temporary path for segmented image
-            temp_segmented_path = os.path.join(segmented_dir, f"temp_{image_info['filename']}")
-            
-            # Perform mycelium segmentation on the image
-            if segment_and_save(image_info["file_path"], temp_segmented_path):
-                # === Growth Stage Prediction ===
-                # Use ML model to predict growth stage from segmented image
-                try:
-                    # Read segmented image as bytes for prediction
-                    with open(temp_segmented_path, 'rb') as img_file:
-                        img_bytes = img_file.read()
-                    
-                    # Run growth stage prediction
-                    prediction_result, prediction_error = predict_growth_stage(img_bytes, version="default")
-                    
-                    if prediction_result and not prediction_error:
-                        # Use predicted class as estimated day
-                        predicted_class = int(prediction_result.get("predicted_class", "0"))
-                        estimated_day = predicted_class
-                        print(f"🔮 Predicted day {estimated_day} for {image_info['filename']}")
-                    else:
-                        # Fallback: calculate day from hours if prediction fails
-                        estimated_day = calculated_hour // 24
-                        print(f"⚠️ Prediction failed for {image_info['filename']}, using timestamp fallback")
-                        
-                except Exception as e:
-                    # Fallback: calculate day from hours if prediction errors
-                    estimated_day = calculated_hour // 24
-                    print(f"⚠️ Prediction error for {image_info['filename']}: {e}")
+            # === Growth Stage Prediction ===
+            # Use ML model to predict growth stage from original image
+            try:
+                # Read original image as bytes for prediction
+                with open(image_info["file_path"], 'rb') as img_file:
+                    img_bytes = img_file.read()
                 
-                # === Database Upload ===
-                # Upload processed image and metadata to PocketBase database
-                if upload_to_pocketbase(temp_segmented_path, test_number, calculated_hour, angle, estimated_day, is_training_data):
-                    uploaded_count += 1
-                    print(f"✅ [{i}/{len(all_images)}] Uploaded: {image_info['filename']} (test{test_number}_h{calculated_hour}_{angle})")
+                # Run growth stage prediction
+                prediction_result, prediction_error = predict_growth_stage(img_bytes, version="default")
+                
+                if prediction_result and not prediction_error:
+                    # Use predicted class as estimated day
+                    predicted_class = int(prediction_result.get("predicted_class", "0"))
+                    estimated_day = predicted_class
+                    print(f"🔮 Predicted day {estimated_day} for {image_info['filename']}")
                 else:
-                    failed_count += 1
-                    print(f"❌ [{i}/{len(all_images)}] Failed: {image_info['filename']}")
-                
-                # Clean up temporary segmented file
-                if os.path.exists(temp_segmented_path):
-                    os.remove(temp_segmented_path)
+                    # Fallback: calculate day from hours if prediction fails
+                    estimated_day = calculated_hour // 24
+                    print(f"⚠️ Prediction failed for {image_info['filename']}, using timestamp fallback")
+                    
+            except Exception as e:
+                # Fallback: calculate day from hours if prediction errors
+                estimated_day = calculated_hour // 24
+                print(f"⚠️ Prediction error for {image_info['filename']}: {e}")
+            
+            # === Database Upload ===
+            # Upload original image and metadata to PocketBase database
+            if upload_to_pocketbase(image_info["file_path"], test_number, calculated_hour, angle, estimated_day, is_training_data):
+                uploaded_count += 1
+                print(f"✅ [{i}/{len(all_images)}] Uploaded: {image_info['filename']} (test{test_number}_h{calculated_hour}_{angle})")
             else:
-                # Segmentation failed for this image
                 failed_count += 1
-                print(f"❌ [{i}/{len(all_images)}] Segmentation failed: {image_info['filename']}")
+                print(f"❌ [{i}/{len(all_images)}] Failed: {image_info['filename']}")
         
         # === Job Completion ===
         # Update job status with final results

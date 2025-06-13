@@ -17,7 +17,6 @@ def mock_all_models():
     # Import modules after setting environment variables
     import prediction.predictor
     import clustering.clusterer
-    import segmentation.segment_mycelium
     
     patches = []
     
@@ -30,9 +29,6 @@ def mock_all_models():
     
     if hasattr(clustering.clusterer, 'joblib'):
         patches.append(patch('clustering.clusterer.joblib.load'))
-    
-    if hasattr(segmentation.segment_mycelium, 'YOLO'):
-        patches.append(patch('segmentation.segment_mycelium.YOLO'))
     
     # Start all patches
     mocks = []
@@ -58,18 +54,6 @@ def mock_all_models():
         mock_pca = Mock()
         mock_pca.transform.return_value = [[0.1] * 100]
         mocks[2].side_effect = [mock_clusterer, mock_pca]
-    
-    if len(mocks) >= 4 and hasattr(segmentation.segment_mycelium, 'YOLO'):
-        # Mock YOLO
-        mock_yolo_instance = Mock()
-        mock_result = Mock()
-        mock_mask = Mock()
-        mock_tensor = Mock()
-        mock_tensor.cpu.return_value.numpy.return_value = [[0.1] * 100]
-        mock_mask.data = [mock_tensor]
-        mock_result.masks = mock_mask
-        mock_yolo_instance.predict.return_value = [mock_result]
-        mocks[3].return_value = mock_yolo_instance
     
     yield
     

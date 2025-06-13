@@ -35,8 +35,11 @@ COPY flask/requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Copy models from project root
-COPY models/ ./models/
+# Copy only the models you need (exclude YOLO model)
+COPY models/best_hybrid_model.keras ./models/
+COPY models/encoder_model.keras ./models/
+COPY models/hdbscan_clusterer.pkl ./models/
+COPY models/pca_model.pkl ./models/
 
 # Switch to nonroot user and copy Flask app files
 USER nonroot

@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, send_file
 from random import random as rng
 from flask_cors import CORS
-from segmentation.segment_mycelium import segment_image, segment_and_save
 from prediction.predictor import predict_growth_stage
 from clustering.clusterer import cluster_image
 import io
@@ -111,14 +110,8 @@ def predict():
     # Get model version from request
     version = request.form.get('version', 'default')
     
-    # Perform segmentation
-    segmented_image, error = segment_image(file.read())
-    if error:
-        return jsonify({ "error": error }), 400
-    
     # === Prediction ===
-    segmented_image.seek(0)  # Reset stream position
-    prediction_result, prediction_error = predict_growth_stage(segmented_image.read(), version=version)
+    prediction_result, prediction_error = predict_growth_stage(file.read(), version=version)
     if prediction_error:
         return jsonify({ "error": prediction_error }), 500
 
@@ -127,7 +120,6 @@ def predict():
         "model_version": version
     })
 
-@app.route('/cluster', methods=['POST'])
 @app.route('/cluster', methods=['POST'])
 def cluster():
     if 'file' not in request.files:
@@ -162,8 +154,7 @@ def health():
         "../models/best_hybrid_model.keras",
         "../models/encoder_model.keras",
         "../models/hdbscan_clusterer.pkl",
-        "../models/pca_model.pkl",
-        "../models/yolo_segmenting_model.pt"
+        "../models/pca_model.pkl"
     ]
     missing = [f for f in default_model_files if not os.path.exists(f)]
     status = "ok" if not missing else "degraded"
