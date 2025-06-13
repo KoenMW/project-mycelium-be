@@ -1,12 +1,5 @@
 import numpy as np
 import os
-from keras.models import load_model
-from keras.preprocessing.image import img_to_array
-from PIL import Image
-import hdbscan
-import joblib
-from sklearn.decomposition import PCA
-from hdbscan.prediction import approximate_predict
 
 # === Config ===
 DEFAULT_ENCODER_PATH = "../models/encoder_model.keras"
@@ -22,8 +15,25 @@ _encoders = {}
 _clusterers = {}
 _pcas = {}
 
+# Only import ML libraries if not in testing mode
+if not os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+    from keras.models import load_model
+    from keras.preprocessing.image import img_to_array
+    from PIL import Image
+    import hdbscan
+    import joblib
+    from sklearn.decomposition import PCA
+    from hdbscan.prediction import approximate_predict
+else:
+    print("🧪 Skipping ML library imports for testing")
+
 def load_clustering_models(version="default"):
     """Load clustering models for specific version"""
+    # Skip loading if in testing mode
+    if os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+        print(f"🧪 Skipping clustering model loading for testing - version: {version}")
+        return None, None, None
+    
     if version in _encoders:
         return _encoders[version], _clusterers[version], _pcas[version]
     
@@ -61,14 +71,25 @@ def load_clustering_models(version="default"):
     print(f"✅ Clustering models loaded for version: {version}")
     return encoder, clusterer, pca
 
-# === Load default models at startup ===
-try:
-    load_clustering_models("default")
-except FileNotFoundError as e:
-    print(f"⚠️ Default clustering models not found: {e}")
+# === Load default models at startup only if not testing ===
+if not os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+    try:
+        load_clustering_models("default")
+    except FileNotFoundError as e:
+        print(f"⚠️ Default clustering models not found: {e}")
 
 # === Clustering function ===
 def cluster_image(image_bytes, hour=None, version="default"):
+    # Return mock data if in testing mode
+    if os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+        return {
+            "cluster": 0,
+            "confidence": 0.85,
+            "hour": hour,
+            "normalized_hour": (hour / MAX_HOUR) if hour else 0.0,
+            "version": version
+        }, None
+    
     try:
         encoder, clusterer, pca = load_clustering_models(version)
         

@@ -1,7 +1,4 @@
 import numpy as np
-from keras.models import load_model
-from keras.preprocessing.image import img_to_array
-from PIL import Image
 import io
 import os
 
@@ -13,8 +10,21 @@ CLASSES = [str(i) for i in range(14)]  # 0–13
 # === Model cache ===
 _models = {}
 
+# Only import ML libraries if not in testing mode
+if not os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+    from keras.models import load_model
+    from keras.preprocessing.image import img_to_array
+    from PIL import Image
+else:
+    print("🧪 Skipping ML library imports for testing")
+
 def load_prediction_model(version="default"):
     """Load prediction model for specific version"""
+    # Skip loading if in testing mode
+    if os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+        print(f"🧪 Skipping prediction model loading for testing - version: {version}")
+        return None
+    
     if version in _models:
         return _models[version]
     
@@ -32,14 +42,23 @@ def load_prediction_model(version="default"):
     print(f"✅ Model loaded for version: {version}")
     return model
 
-# === Load default model at startup ===
-try:
-    load_prediction_model("default")
-except FileNotFoundError:
-    print("⚠️ Default prediction model not found")
+# === Load default model at startup only if not testing ===
+if not os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+    try:
+        load_prediction_model("default")
+    except FileNotFoundError:
+        print("⚠️ Default prediction model not found")
 
 # === Prediction function ===
 def predict_growth_stage(image_bytes, version="default"):
+    # Return mock data if in testing mode
+    if os.getenv('SKIP_MODEL_LOADING', 'false').lower() == 'true':
+        return {
+            "predicted_class": "5",
+            "confidence": 0.92,
+            "version": version
+        }, None
+    
     try:
         model = load_prediction_model(version)
         
